@@ -1,0 +1,2 @@
+BOT_TOKEN = 'Your telegram bot token'
+LOG_FILE = './hermes.log'
