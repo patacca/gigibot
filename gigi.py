@@ -11,9 +11,8 @@ headers = {
 CF_STATE, PASSWORD_STATE = range(2)
 
 # shared variable
-_TOKEN = None # This is the OAuth2 token for logging in
 accounts = {}
-oldProjects = {}
+alreadyChecked = {}
 _session = None
 
 def getSession():
@@ -43,13 +42,25 @@ def daemonRun(context):
 	
 	matches = re.findall('<button class="btn btn-primary btn-full".*?>(.*?)</button>', r.text)
 	
+	for k in alreadyChecked:
+		alreadyChecked[k] = False
 	for m in matches:
 		if 'DISPONIBILITA ESAURITA' in m:
 			continue
 		# We got one!
+		if m in alreadyChecked:
+			alreadyChecked[m] = True
+			continue
+		alreadyChecked[m] = True
 		logger.info(f'Chat {chatId} found one free spot')
 		logger.debug(f'free spot content: {r.text}')
 		context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot')
+	toRemove = []
+	for k,v in alreadyChecked.items():
+		if not v:
+			toRemove.append(k)
+	for k in toRemove:
+		alreadyChecked.pop(k)
 
 def start(update, context):
 	if update.effective_chat.id in accounts:
