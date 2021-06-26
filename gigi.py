@@ -51,14 +51,13 @@ def daemonRun(context):
 		if m in alreadyChecked:
 			alreadyChecked[m] = True
 			continue
+		
 		alreadyChecked[m] = True
 		id1, id2 = re.match('.*act_step\(([0-9]*),([0-9]*)\).*', extra).groups()
 		
 		startDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
 		endDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
-		r2 = session.post(BASE_URL + '/ulss9', data={'azione':'jscalendario', 'servizio':746, 'sede':id2, 'start':startDate, 'end':endDate)
-		
-		
+		r2 = session.post(BASE_URL + '/ulss9', data={'azione':'jscalendario', 'servizio':746, 'sede':id2, 'start':startDate, 'end':endDate})
 		
 		logger.info(f'Chat {chatId} found one free spot with id({id1},{id2})')
 		logger.debug(f'free spot content: {r.text}')
