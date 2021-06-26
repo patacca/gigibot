@@ -40,11 +40,11 @@ def daemonRun(context):
 		logger.debug(f'ERROR CONTENT: {r.text}')
 		return
 	
-	matches = re.findall('<button class="btn btn-primary btn-full".*?>(.*?)</button>', r.text)
+	matches = re.findall('<button class="btn btn-primary btn-full"(.*?)>(.*?)</button>', r.text)
 	
 	for k in alreadyChecked:
 		alreadyChecked[k] = False
-	for m in matches:
+	for extra,m in matches:
 		if 'DISPONIBILITA ESAURITA' in m:
 			continue
 		# We got one!
@@ -52,8 +52,17 @@ def daemonRun(context):
 			alreadyChecked[m] = True
 			continue
 		alreadyChecked[m] = True
-		logger.info(f'Chat {chatId} found one free spot')
+		id1, id2 = re.match('.*act_step\(([0-9]*),([0-9]*)\).*', extra).groups()
+		
+		startDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
+		endDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
+		r2 = session.post(BASE_URL + '/ulss9', data={'azione':'jscalendario', 'servizio':746, 'sede':id2, 'start':startDate, 'end':endDate)
+		
+		
+		
+		logger.info(f'Chat {chatId} found one free spot with id({id1},{id2})')
 		logger.debug(f'free spot content: {r.text}')
+		logger.debug(f'free spot day content: {r2.json()}')
 		context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot')
 	toRemove = []
 	for k,v in alreadyChecked.items():
