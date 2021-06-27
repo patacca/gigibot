@@ -103,14 +103,14 @@ def password(update, context):
 	return ConversationHandler.END
 
 def cancel(update, context):
-	accounts.remove(update.effective_chat.id)
+	accounts.pop(update.effective_chat.id)
 	logger.debug(f'Chat {update.effective_chat.id}: cancel conversation')
 	update.message.reply_text('Bye!', reply_markup=ReplyKeyboardRemove())
 	return ConversationHandler.END
 
 def stop(update, context):
 	try:
-		accounts.remove(update.effective_chat.id)
+		accounts.pop(update.effective_chat.id)
 	except:
 		pass
 	logger.debug(f'Chat {update.effective_chat.id}: bot stopped')
