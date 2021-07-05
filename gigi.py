@@ -2,7 +2,7 @@
 
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters
 from config import BOT_TOKEN, LOG_FILE
-import requests, re, logging, time, sys, datetime
+import requests, re, logging, time, sys, datetime, time
 
 BASE_URL = 'https://vaccinicovid.regione.veneto.it'
 headers = {
@@ -12,7 +12,7 @@ CF_STATE, PASSWORD_STATE = range(2)
 
 # shared variable
 accounts = {}
-alreadyChecked = {}
+globalAlreadyChecked = {}
 _session = None
 
 def getSession():
@@ -42,6 +42,7 @@ def daemonRun(context):
 	
 	matches = re.findall('<button class="btn btn-primary btn-full"(.*?)>(.*?)</button>', r.text)
 	
+	alreadyChecked = globalAlreadyChecked[chatId]
 	for k in alreadyChecked:
 		alreadyChecked[k] = False
 	for extra,m in matches:
@@ -55,14 +56,19 @@ def daemonRun(context):
 		alreadyChecked[m] = True
 		id1, id2 = re.match('.*act_step\(([0-9]*),([0-9]*)\).*', extra).groups()
 		
-		startDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
-		endDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
+		startDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=60), "%Y-%m-%dT%H:%M:%S+02:00")
+		endDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=60), "%Y-%m-%dT%H:%M:%S+02:00")
 		r2 = session.post(BASE_URL + '/ulss9', data={'azione':'jscalendario', 'servizio':746, 'sede':id2, 'start':startDate, 'end':endDate})
 		
 		logger.info(f'Chat {chatId} found one free spot with id({id1},{id2})')
-		logger.debug(f'free spot content: {r.text}')
-		logger.debug(f'free spot day content: {r2.json()}')
-		context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot')
+		logger.debug(f'free spot content: {r2.text}')
+		data = r2.json()
+		logger.debug(f'free spot day content: {data}')
+		
+		# each element is a single free slot
+		for freeSlot in data:
+			context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot in date {freeSlot["start"]}')
+		
 	toRemove = []
 	for k,v in alreadyChecked.items():
 		if not v:
@@ -98,14 +104,15 @@ def password(update, context):
 	accounts[update.effective_chat.id]['password'] = passwordValue
 	update.message.reply_text("Perfect! You will now receive here the notifications")
 	
-	context.job_queue.run_repeating(daemonRun, 2, context={'chatId': update.effective_chat.id})
+	globalAlreadyChecked[update.effective_chat.id] = {}
+	context.job_queue.run_repeating(daemonRun, 2, context={'chatId': update.effective_chat.id}, name=str(update.effective_chat.id))
 	
 	return ConversationHandler.END
 
 def cancel(update, context):
 	accounts.pop(update.effective_chat.id)
 	logger.debug(f'Chat {update.effective_chat.id}: cancel conversation')
-	update.message.reply_text('Bye!', reply_markup=ReplyKeyboardRemove())
+	update.message.reply_text('Bye!')
 	return ConversationHandler.END
 
 def stop(update, context):
@@ -114,8 +121,11 @@ def stop(update, context):
 	except:
 		pass
 	logger.debug(f'Chat {update.effective_chat.id}: bot stopped')
-	update.message.reply_text('Stopping now. Bye!', reply_markup=ReplyKeyboardRemove())
-	context.job_queue.stop()
+	update.message.reply_text('Stopping now. Bye!')
+	# ~ context.job_queue.stop()
+	job = context.job_queue.get_jobs_by_name(str(update.effective_chat.id))
+	if len(job) == 1:
+		job[0].schedule_removal()
 
 if __name__ == '__main__':
 	logger = logging.getLogger(__name__)
@@ -143,4 +153,3 @@ if __name__ == '__main__':
 	
 	updater.start_polling()
 	updater.idle()
-
