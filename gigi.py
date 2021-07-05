@@ -2,7 +2,7 @@
 
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters
 from config import BOT_TOKEN, LOG_FILE
-import requests, re, logging, time, sys
+import requests, re, logging, time, sys, datetime
 
 BASE_URL = 'https://vaccinicovid.regione.veneto.it'
 headers = {
