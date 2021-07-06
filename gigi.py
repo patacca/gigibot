@@ -67,7 +67,7 @@ def daemonRun(context):
 		# Unchecking dates
 		for k in alreadyFree[m]:
 			if k != 'checked':
-				alreadyFree[m] = False
+				alreadyFree[m][k] = False
 		
 		# each element is a single free slot
 		for freeSlot in data:
