@@ -1,6 +1,7 @@
 #!/bin/env python3
 
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters
+import telegram
 from config import BOT_TOKEN, LOG_FILE
 import requests, re, logging, time, sys, datetime, time
 
@@ -79,7 +80,7 @@ def daemonRun(context):
 				continue
 			alreadyFree[m][dateStart] = True
 			
-			context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot in date {dateStart} in center `{m}`')
+			context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot in date {dateStart}\nin center `{m}`', parse_mode=telegram.ParseMode.MARKDOWN)
 		
 		# Remove unchecked dates
 		for k,v in list(alreadyFree[m].items()):
