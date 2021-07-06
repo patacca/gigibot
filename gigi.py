@@ -12,7 +12,7 @@ CF_STATE, PASSWORD_STATE = range(2)
 
 # shared variable
 accounts = {}
-globalAlreadyChecked = {}
+globalAlreadyFree = {}
 _session = None
 
 def getSession():
@@ -42,21 +42,20 @@ def daemonRun(context):
 	
 	matches = re.findall('<button class="btn btn-primary btn-full"(.*?)>(.*?)</button>', r.text)
 	
-	alreadyChecked = globalAlreadyChecked[chatId]
-	for k in alreadyChecked:
-		alreadyChecked[k] = False
+	alreadyFree = globalAlreadyFree[chatId]
+	# Unchecking all the elements
+	for k in alreadyFree:
+		alreadyFree[k]['checked'] = False
+	
 	for extra,m in matches:
 		if 'DISPONIBILITA ESAURITA' in m:
 			continue
-		# We got one!
-		if m in alreadyChecked:
-			alreadyChecked[m] = True
-			continue
+		alreadyFree.setdefault(m, {})
+		alreadyFree[m]['checked'] = True
 		
-		alreadyChecked[m] = True
 		id1, id2 = re.match('.*act_step\(([0-9]*),([0-9]*)\).*', extra).groups()
 		
-		startDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=60), "%Y-%m-%dT%H:%M:%S+02:00")
+		startDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(days=30), "%Y-%m-%dT%H:%M:%S+02:00")
 		endDate = datetime.datetime.strftime(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=60), "%Y-%m-%dT%H:%M:%S+02:00")
 		r2 = session.post(BASE_URL + '/ulss9', data={'azione':'jscalendario', 'servizio':746, 'sede':id2, 'start':startDate, 'end':endDate})
 		
@@ -65,16 +64,32 @@ def daemonRun(context):
 		data = r2.json()
 		logger.debug(f'free spot day content: {data}')
 		
+		# Unchecking dates
+		for k in alreadyFree[m]:
+			if k != 'checked':
+				alreadyFree[m] = False
+		
 		# each element is a single free slot
 		for freeSlot in data:
-			context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot in date {freeSlot["start"]}')
+			dateStart = freeSlot['start']
+			
+			# Check if it has already been notified
+			if dateStart in alreadyFree[m]:
+				alreadyFree[m][dateStart] = True
+				continue
+			alreadyFree[m][dateStart] = True
+			
+			context.bot.send_message(chat_id=chatId, text=f'Hurry up! There is one free spot in date {dateStart} in center `{m}`')
 		
-	toRemove = []
-	for k,v in alreadyChecked.items():
-		if not v:
-			toRemove.append(k)
-	for k in toRemove:
-		alreadyChecked.pop(k)
+		# Remove unchecked dates
+		for k,v in list(alreadyFree[m].items()):
+			if k != 'checked' and not v:
+				alreadyFree[m].pop(k)
+	
+	# Remove elements that were not checked in this round
+	for k,v in list(alreadyFree.items()):
+		if not v['checked']:
+			alreadyFree.pop(k)
 
 def start(update, context):
 	if update.effective_chat.id in accounts:
@@ -104,7 +119,7 @@ def password(update, context):
 	accounts[update.effective_chat.id]['password'] = passwordValue
 	update.message.reply_text("Perfect! You will now receive here the notifications")
 	
-	globalAlreadyChecked[update.effective_chat.id] = {}
+	globalAlreadyFree[update.effective_chat.id] = {}
 	context.job_queue.run_repeating(daemonRun, 2, context={'chatId': update.effective_chat.id}, name=str(update.effective_chat.id))
 	
 	return ConversationHandler.END
