@@ -75,8 +75,10 @@ def daemonRun(context):
 			dateStart = freeSlot['start']
 			
 			# Check if it is within the user time range
-			if dateStart < accounts[chatId]['startDate'].strftime('%Y-%m-%d') or
-				dateStart > accounts[chatId]['endDate'].strftime('%Y-%m-%d'):
+			if (
+				dateStart < accounts[chatId]['startDate'].strftime('%Y-%m-%d') or
+				dateStart > accounts[chatId]['endDate'].strftime('%Y-%m-%d')
+			):
 				continue
 			
 			# Check if it has already been notified
