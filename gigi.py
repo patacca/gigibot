@@ -141,19 +141,20 @@ def password(update, context):
 	logger.debug(f'Chat {update.effective_chat.id}: got password {passwordValue}')
 	accounts[update.effective_chat.id]['password'] = passwordValue
 	
+	update.message.reply_text("Now you have to specify for which time range you are searching.")
+	update.message.reply_text("Write the starting date and the ending date (both included) (they both can be either in the future or in the past)")
+	update.message.reply_text("The format <b>must</b> be the following: <b>mm-dd_mm-dd</b>", parse_mode=telegram.ParseMode.HTML)
+	update.message.reply_text("The first is the starting date and the latter is the ending date")
+	
 	return SETRANGE_STATE
 
 def setRange(update, context):
-	update.message.reply_text("Now you have to specify for which time range you are searching.")
-	update.message.reply_text("Write the starting date and the ending date (both included) (they both can be either in the future or in the past)")
-	update.message.reply_text("The format **must** be the following: **mm-dd_mm-dd**", parse_mode=telegram.ParseMode.MARKDOWN)
-	update.message.reply_text("The first is the starting date and the latter is the ending date")
-	while True:
-		startDate, endDate = parseDateRange(update.message.text)
-		if startDate is None:
-			update.message.reply_text("The date range you entered is in a wrong format. Please send it again in the right format.")
-		else:
-			break
+	startDate, endDate = parseDateRange(update.message.text)
+	if startDate is None:
+		update.message.reply_text("The date range you entered is in a wrong format. Please send it again in the right format.")
+		return SETRANGE_STATE
+	
+	logger.debug(f'Chat {update.effective_chat.id}: got timerange ({startDate.strftime("%Y-%m-%d")} {endDate.strftime("%Y-%m-%d")})')
 	
 	accounts[update.effective_chat.id]['startDate'] = startDate
 	accounts[update.effective_chat.id]['endDate'] = endDate
