@@ -9,7 +9,7 @@ BASE_URL = 'https://vaccinicovid.regione.veneto.it'
 headers = {
 	'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; rv:71.0) Gecko/20100101 Firefox/71.0'
 }
-CF_STATE, PASSWORD_STATE = range(2)
+CF_STATE, PASSWORD_STATE, SETRANGE_STATE = range(3)
 
 # shared variable
 accounts = {}
@@ -74,6 +74,11 @@ def daemonRun(context):
 		for freeSlot in data:
 			dateStart = freeSlot['start']
 			
+			# Check if it is within the user time range
+			if dateStart < accounts[chatId]['startDate'].strftime('%Y-%m-%d') or
+				dateStart > accounts[chatId]['endDate'].strftime('%Y-%m-%d'):
+				continue
+			
 			# Check if it has already been notified
 			if dateStart in alreadyFree[m]:
 				alreadyFree[m][dateStart] = True
@@ -91,6 +96,21 @@ def daemonRun(context):
 	for k,v in list(alreadyFree.items()):
 		if not v['checked']:
 			alreadyFree.pop(k)
+
+def parseDateRange(dateRangeStr):
+	currYear = str(datetime.datetime.now().year)
+	dateRange = dateRangeStr.strip().split('_')
+	if len(dateRange) != 2:
+		return (None, None)
+	
+	datetimeList = []
+	for date in dateRange:
+		try:
+			datetimeList.append(datetime.datetime.strptime(currYear+'-'+date, '%Y-%m-%d'))
+		except:
+			return (None, None)
+	
+	return datetimeList
 
 def start(update, context):
 	if update.effective_chat.id in accounts:
@@ -118,7 +138,26 @@ def password(update, context):
 	passwordValue = update.message.text
 	logger.debug(f'Chat {update.effective_chat.id}: got password {passwordValue}')
 	accounts[update.effective_chat.id]['password'] = passwordValue
-	update.message.reply_text("Perfect! You will now receive here the notifications")
+	
+	return SETRANGE_STATE
+
+def setRange(update, context):
+	update.message.reply_text("Now you have to specify for which time range you are searching.")
+	update.message.reply_text("Write the starting date and the ending date (both included) (they both can be either in the future or in the past)")
+	update.message.reply_text("The format **must** be the following: **mm-dd_mm-dd**", parse_mode=telegram.ParseMode.MARKDOWN)
+	update.message.reply_text("The first is the starting date and the latter is the ending date")
+	while True:
+		startDate, endDate = parseDateRange(update.message.text)
+		if startDate is None:
+			update.message.reply_text("The date range you entered is in a wrong format. Please send it again in the right format.")
+		else:
+			break
+	
+	accounts[update.effective_chat.id]['startDate'] = startDate
+	accounts[update.effective_chat.id]['endDate'] = endDate
+	
+	update.message.reply_text(f'Perfect! You will receive notifications from {startDate.strftime("%Y-%m-%d")} to {endDate.strftime("%Y-%m-%d")}')
+	update.message.reply_text(f'To stop the bot just send the command /stop')
 	
 	globalAlreadyFree[update.effective_chat.id] = {}
 	context.job_queue.run_repeating(daemonRun, 2, context={'chatId': update.effective_chat.id}, name=str(update.effective_chat.id))
@@ -161,6 +200,7 @@ if __name__ == '__main__':
 		states={
 			CF_STATE: [MessageHandler(Filters.text & ~Filters.command, cf)],
 			PASSWORD_STATE: [MessageHandler(Filters.text & ~Filters.command, password)],
+			SETRANGE_STATE: [MessageHandler(Filters.text & ~Filters.command, setRange)],
 		},
 		fallbacks=[CommandHandler('cancel', cancel)],
 	)
